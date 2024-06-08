@@ -6,22 +6,19 @@ import com.example.interview.model.Transaction;
 import com.example.interview.repository.AccountRepository;
 import com.example.interview.repository.BeneficiaryRepository;
 import com.example.interview.repository.TransactionRepository;
-import com.opencsv.CSVReader;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
-import org.springframework.boot.CommandLineRunner;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.io.Reader;
-import java.util.List;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.stream.Collectors;
 
 @Component
 public class DataLoader implements CommandLineRunner {
-
-    private static final Logger logger = LoggerFactory.getLogger(DataLoader.class);
 
     @Autowired
     private BeneficiaryRepository beneficiaryRepository;
@@ -39,72 +36,81 @@ public class DataLoader implements CommandLineRunner {
         loadTransactions();
     }
 
-    private void loadBeneficiaries() {
-        try (Reader reader = new InputStreamReader(new ClassPathResource("beneficiaries.csv").getInputStream());
-             CSVReader csvReader = new CSVReader(reader)) {
-            List<String[]> records = csvReader.readAll();
-            if (records.size() > 0) {
-                records.remove(0); // Remove header for xls file
-            }
-            for (String[] record : records) {
-                if (record.length < 3) {
-                    continue;
-                }
-                Beneficiary beneficiary = new Beneficiary();
-                beneficiary.setBeneficiaryId(Long.parseLong(record[0]));
-                beneficiary.setFirstName(record[1]);
-                beneficiary.setLastName(record[2]);
-                beneficiaryRepository.save(beneficiary);
-                logger.info("Saved beneficiary: {}", beneficiary);
-            }
-        } catch (Exception e) {
-            logger.error("Error loading beneficiaries", e);
+    private void loadBeneficiaries() throws Exception {
+        var resource = new ClassPathResource("beneficiaries.csv");
+        try (var reader = new BufferedReader(new InputStreamReader(resource.getInputStream()))) {
+            var beneficiaries = reader.lines()
+                    .skip(1)
+                    .map(line -> {
+                        var fields = line.split(",");
+                        if (fields.length >= 3) {
+                            var beneficiary = new Beneficiary();
+                            beneficiary.setBeneficiaryId(Long.parseLong(fields[0]));
+                            beneficiary.setFirstName(fields[1]);
+                            beneficiary.setLastName(fields[2]);
+                            return beneficiary;
+                        } else {
+                            System.err.println("Invalid beneficiary line: " + line);
+                            return null;
+                        }
+                    })
+                    .filter(beneficiary -> beneficiary != null)
+                    .collect(Collectors.toList());
+
+            beneficiaryRepository.saveAll(beneficiaries);
         }
     }
 
-    private void loadAccounts() {
-        try (Reader reader = new InputStreamReader(new ClassPathResource("accounts.csv").getInputStream());
-             CSVReader csvReader = new CSVReader(reader)) {
-            List<String[]> records = csvReader.readAll();
-            if (records.size() > 0) {
-                records.remove(0); // Remove header for xls file
-            }
-            for (String[] record : records) {
-                if (record.length < 2) {
-                    continue;
-                }
-                Account account = new Account();
-                account.setAccountId(Long.parseLong(record[0]));
-                account.setBeneficiaryId(Long.parseLong(record[1]));
-                accountRepository.save(account);
-                logger.info("Saved account: {}", account);
-            }
-        } catch (Exception e) {
-            logger.error("Error loading accounts", e);
+    private void loadAccounts() throws Exception {
+        var resource = new ClassPathResource("accounts.csv");
+        try (var reader = new BufferedReader(new InputStreamReader(resource.getInputStream()))) {
+            var accounts = reader.lines()
+                    .skip(1)
+                    .map(line -> {
+                        var fields = line.split(",");
+                        if (fields.length >= 2) {
+                            var account = new Account();
+                            account.setAccountId(Long.parseLong(fields[0]));
+                            account.setBeneficiaryId(Long.parseLong(fields[1]));
+                            return account;
+                        } else {
+
+                            System.err.println("Invalid account line: " + line);
+                            return null;
+                        }
+                    })
+                    .filter(account -> account != null)
+                    .collect(Collectors.toList());
+
+            accountRepository.saveAll(accounts);
         }
     }
 
-    private void loadTransactions() {
-        try (Reader reader = new InputStreamReader(new ClassPathResource("transactions.csv").getInputStream());
-             CSVReader csvReader = new CSVReader(reader)) {
-            List<String[]> records = csvReader.readAll();
-            if (records.size() > 0) {
-                records.remove(0); // Remove header for xls file
-            }
-            for (String[] record : records) {
-                if (record.length < 4) {
-                    continue;
-                }
-                Transaction transaction = new Transaction();
-                transaction.setTransactionId(Long.parseLong(record[0]));
-                transaction.setAccountId(Long.parseLong(record[1]));
-                transaction.setAmount(Double.parseDouble(record[2]));
-                transaction.setType(record[3]);
-                transactionRepository.save(transaction);
-                logger.info("Saved transaction: {}", transaction);
-            }
-        } catch (Exception e) {
-            logger.error("Error loading transactions", e);
+    private void loadTransactions() throws Exception {
+        var resource = new ClassPathResource("transactions.csv");
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM/dd/yy");
+        try (var reader = new BufferedReader(new InputStreamReader(resource.getInputStream()))) {
+            var transactions = reader.lines()
+                    .skip(1)
+                    .map(line -> {
+                        var fields = line.split(",");
+                        if (fields.length >= 5) {
+                            var transaction = new Transaction();
+                            transaction.setTransactionId(Long.parseLong(fields[0]));
+                            transaction.setAccountId(Long.parseLong(fields[1]));
+                            transaction.setAmount(Double.parseDouble(fields[2]));
+                            transaction.setType(fields[3]);
+                            transaction.setDate(LocalDate.parse(fields[4], formatter));
+                            return transaction;
+                        } else {
+                            System.err.println("Invalid transaction line: " + line);
+                            return null;
+                        }
+                    })
+                    .filter(transaction -> transaction != null)
+                    .collect(Collectors.toList());
+
+            transactionRepository.saveAll(transactions);
         }
     }
 }

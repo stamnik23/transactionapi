@@ -1,169 +1,119 @@
 package com.example.interview.controller;
 
-import com.example.interview.exception.ResourceNotFoundException;
-import com.example.interview.model.Account;
-import com.example.interview.model.Beneficiary;
-import com.example.interview.model.Transaction;
 import com.example.interview.service.BeneficiaryService;
+import com.example.interview.model.Beneficiary;
+import com.example.interview.model.Account;
+import com.example.interview.model.Transaction;
+import com.example.interview.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.ResultActions;
 
+import java.time.LocalDate;
 import java.util.Arrays;
-import java.util.List;
+import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 
-@SpringBootTest
+@WebMvcTest(BeneficiaryController.class)
 public class BeneficiaryControllerTest {
 
-    @Mock
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
     private BeneficiaryService beneficiaryService;
 
-    @InjectMocks
-    private BeneficiaryController beneficiaryController;
-
-    @BeforeEach
-    public void setUp() {
-        MockitoAnnotations.openMocks(this);
-    }
-
     @Test
-    public void testGetBeneficiary() {
+    public void testGetBeneficiary() throws Exception {
         Beneficiary beneficiary = new Beneficiary();
         beneficiary.setBeneficiaryId(1L);
-        beneficiary.setFirstName("John");
-        beneficiary.setLastName("Doe");
+        beneficiary.setFirstName("Nikos");
+        beneficiary.setLastName("Stamou");
 
-        when(beneficiaryService.getBeneficiary(1L)).thenReturn(beneficiary);
+        when(beneficiaryService.getBeneficiary(anyLong())).thenReturn(beneficiary);
 
-        Beneficiary result = beneficiaryController.getBeneficiary(1L);
-        assertEquals(1L, result.getBeneficiaryId());
-        assertEquals("John", result.getFirstName());
-        assertEquals("Doe", result.getLastName());
+        mockMvc.perform(get("/beneficiaries/1"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(content().json("{\"beneficiaryId\":1,\"firstName\":\"Nikos\",\"lastName\":\"Stamou\"}"));
     }
 
     @Test
-    public void testGetBeneficiaryNotFound() {
-        when(beneficiaryService.getBeneficiary(anyLong())).thenThrow(new ResourceNotFoundException("Beneficiary not found"));
-        assertThrows(ResourceNotFoundException.class, () -> beneficiaryController.getBeneficiary(1L));
+    public void testGetBeneficiaryNotFound() throws Exception {
+        when(beneficiaryService.getBeneficiary(anyLong())).thenThrow(new ResourceNotFoundException("Beneficiary not found", 1L));
+
+        mockMvc.perform(get("/beneficiaries/1"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    public void testGetBeneficiaryAccounts() {
-        Account account1 = new Account();
-        account1.setAccountId(1L);
-        account1.setBeneficiaryId(1L);
+    public void testGetBeneficiaryBalance() throws Exception {
+        when(beneficiaryService.getBeneficiaryBalance(anyLong())).thenReturn(-30.3);
 
-        Account account2 = new Account();
-        account2.setAccountId(2L);
-        account2.setBeneficiaryId(1L);
-
-        when(beneficiaryService.getBeneficiaryAccounts(1L)).thenReturn(Arrays.asList(account1, account2));
-
-        List<Account> accounts = beneficiaryController.getBeneficiaryAccounts(1L);
-        assertEquals(2, accounts.size());
+        mockMvc.perform(get("/beneficiaries/1/balance"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(content().json("-30.3"));
     }
 
     @Test
-    public void testGetBeneficiaryTransactions() {
-        Account account1 = new Account();
-        account1.setAccountId(1L);
-        account1.setBeneficiaryId(1L);
+    public void testGetBeneficiaryAccounts() throws Exception {
+        Account account = new Account();
+        account.setAccountId(1L);
+        account.setBeneficiaryId(1L);
 
-        Account account2 = new Account();
-        account2.setAccountId(2L);
-        account2.setBeneficiaryId(1L);
+        when(beneficiaryService.getBeneficiaryAccounts(anyLong())).thenReturn(Arrays.asList(account));
 
-        Transaction transaction1 = new Transaction();
-        transaction1.setTransactionId(1L);
-        transaction1.setAccountId(1L);
-        transaction1.setAmount(200.0);
-        transaction1.setType("deposit");
-
-        Transaction transaction2 = new Transaction();
-        transaction2.setTransactionId(2L);
-        transaction2.setAccountId(2L);
-        transaction2.setAmount(100.0);
-        transaction2.setType("withdrawal");
-
-        when(beneficiaryService.getBeneficiaryTransactions(1L)).thenReturn(Arrays.asList(transaction1, transaction2));
-
-        List<Transaction> transactions = beneficiaryController.getBeneficiaryTransactions(1L);
-        assertEquals(2, transactions.size());
+        mockMvc.perform(get("/beneficiaries/1/accounts"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(content().json("[{\"accountId\":1,\"beneficiaryId\":1}]"));
     }
 
     @Test
-    public void testGetBeneficiaryBalance() {
-        Account account1 = new Account();
-        account1.setAccountId(1L);
-        account1.setBeneficiaryId(1L);
+    public void testGetBeneficiaryTransactions() throws Exception {
+        Transaction transaction = new Transaction();
+        transaction.setTransactionId(1L);
+        transaction.setAccountId(1L);
+        transaction.setAmount(100.0);
+        transaction.setType("deposit");
+        transaction.setDate(LocalDate.now());
 
-        Account account2 = new Account();
-        account2.setAccountId(2L);
-        account2.setBeneficiaryId(1L);
+        when(beneficiaryService.getBeneficiaryTransactions(anyLong())).thenReturn(Arrays.asList(transaction));
 
-        Transaction transaction1 = new Transaction();
-        transaction1.setTransactionId(1L);
-        transaction1.setAccountId(1L);
-        transaction1.setAmount(200.0);
-        transaction1.setType("deposit");
-
-        Transaction transaction2 = new Transaction();
-        transaction2.setTransactionId(2L);
-        transaction2.setAccountId(2L);
-        transaction2.setAmount(100.0);
-        transaction2.setType("withdrawal");
-
-        Transaction transaction3 = new Transaction();
-        transaction3.setTransactionId(3L);
-        transaction3.setAccountId(1L);
-        transaction3.setAmount(200.0);
-        transaction3.setType("deposit");
-
-        when(beneficiaryService.getBeneficiaryBalance(1L)).thenReturn(300.0);
-
-        Double balance = beneficiaryController.getBeneficiaryBalance(1L);
-        assertEquals(300.0, balance);
+        mockMvc.perform(get("/beneficiaries/1/transactions"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(content().json("[{\"transactionId\":1,\"accountId\":1,\"amount\":100.0,\"type\":\"deposit\",\"date\":\"" + LocalDate.now().toString() + "\"}]"));
     }
 
     @Test
-    public void testGetLargestWithdrawal() {
-        Account account1 = new Account();
-        account1.setAccountId(1L);
-        account1.setBeneficiaryId(1L);
+    public void testGetLargestWithdrawal() throws Exception {
+        Transaction transaction = new Transaction();
+        transaction.setTransactionId(1L);
+        transaction.setAccountId(1L);
+        transaction.setAmount(200.0);
+        transaction.setType("withdrawal");
+        transaction.setDate(LocalDate.now().minusDays(15));
 
-        Account account2 = new Account();
-        account2.setAccountId(2L);
-        account2.setBeneficiaryId(1L);
+        when(beneficiaryService.getLargestWithdrawal(anyLong())).thenReturn(transaction);
 
-        Transaction transaction1 = new Transaction();
-        transaction1.setTransactionId(1L);
-        transaction1.setAccountId(1L);
-        transaction1.setAmount(50.0);
-        transaction1.setType("withdrawal");
-
-        Transaction transaction2 = new Transaction();
-        transaction2.setTransactionId(2L);
-        transaction2.setAccountId(2L);
-        transaction2.setAmount(100.0);
-        transaction2.setType("withdrawal");
-
-        when(beneficiaryService.getLargestWithdrawal(1L)).thenReturn(transaction2);
-
-        Transaction largestWithdrawal = beneficiaryController.getLargestWithdrawal(1L);
-        assertEquals(100.0, largestWithdrawal.getAmount());
-    }
-
-    @Test
-    public void testGetLargestWithdrawalNotFound() {
-        when(beneficiaryService.getLargestWithdrawal(anyLong())).thenThrow(new ResourceNotFoundException("No withdrawals found for beneficiary"));
-        assertThrows(ResourceNotFoundException.class, () -> beneficiaryController.getLargestWithdrawal(1L));
+        mockMvc.perform(get("/beneficiaries/1/largest-withdrawal"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(content().json("{\"transactionId\":1,\"accountId\":1,\"amount\":200.0,\"type\":\"withdrawal\",\"date\":\"" + LocalDate.now().minusDays(15).toString() + "\"}"));
     }
 }
