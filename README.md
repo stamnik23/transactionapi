@@ -27,11 +27,11 @@ This project is a system for managing beneficiary accounts using three CSV files
    
 2. Build the project
 
-  mvn clean install
+     mvn clean install
   
 3.Run the application
 
-  mvn spring-boot:run
+     mvn spring-boot:run
   
 4.The application will start on http://localhost:8080.
 
