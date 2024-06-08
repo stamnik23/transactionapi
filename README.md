@@ -21,12 +21,18 @@ This project is a system for managing beneficiary accounts using three CSV files
 
 ### Setup
 
-1. Clone the repository:
+1. Clone the repository
+   
    git clone https://github.com/stamnik23/transactionapi.git
-2.Build the project
+   
+2. Build the project
+
   mvn clean install
-3.Run the application:
+  
+3.Run the application
+
   mvn spring-boot:run
+  
 4.The application will start on http://localhost:8080.
 
 Project Structure
