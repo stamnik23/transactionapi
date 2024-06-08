@@ -4,10 +4,7 @@ import com.example.interview.exception.ResourceNotFoundException;
 import com.example.interview.model.Account;
 import com.example.interview.model.Beneficiary;
 import com.example.interview.model.Transaction;
-import com.example.interview.repository.AccountRepository;
-import com.example.interview.repository.BeneficiaryRepository;
-
-import com.example.interview.repository.TransactionRepository;
+import com.example.interview.service.BeneficiaryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -17,7 +14,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -28,13 +24,7 @@ import static org.mockito.Mockito.when;
 public class BeneficiaryControllerTest {
 
     @Mock
-    private BeneficiaryRepository beneficiaryRepository;
-
-    @Mock
-    private AccountRepository accountRepository;
-
-    @Mock
-    private TransactionRepository transactionRepository;
+    private BeneficiaryService beneficiaryService;
 
     @InjectMocks
     private BeneficiaryController beneficiaryController;
@@ -51,7 +41,7 @@ public class BeneficiaryControllerTest {
         beneficiary.setFirstName("John");
         beneficiary.setLastName("Doe");
 
-        when(beneficiaryRepository.findById(1L)).thenReturn(Optional.of(beneficiary));
+        when(beneficiaryService.getBeneficiary(1L)).thenReturn(beneficiary);
 
         Beneficiary result = beneficiaryController.getBeneficiary(1L);
         assertEquals(1L, result.getBeneficiaryId());
@@ -61,7 +51,7 @@ public class BeneficiaryControllerTest {
 
     @Test
     public void testGetBeneficiaryNotFound() {
-        when(beneficiaryRepository.findById(anyLong())).thenReturn(Optional.empty());
+        when(beneficiaryService.getBeneficiary(anyLong())).thenThrow(new ResourceNotFoundException("Beneficiary not found"));
         assertThrows(ResourceNotFoundException.class, () -> beneficiaryController.getBeneficiary(1L));
     }
 
@@ -75,7 +65,7 @@ public class BeneficiaryControllerTest {
         account2.setAccountId(2L);
         account2.setBeneficiaryId(1L);
 
-        when(accountRepository.findByBeneficiaryId(1L)).thenReturn(Arrays.asList(account1, account2));
+        when(beneficiaryService.getBeneficiaryAccounts(1L)).thenReturn(Arrays.asList(account1, account2));
 
         List<Account> accounts = beneficiaryController.getBeneficiaryAccounts(1L);
         assertEquals(2, accounts.size());
@@ -100,11 +90,10 @@ public class BeneficiaryControllerTest {
         Transaction transaction2 = new Transaction();
         transaction2.setTransactionId(2L);
         transaction2.setAccountId(2L);
-        transaction2.setAmount(-100.0);
+        transaction2.setAmount(100.0);
         transaction2.setType("withdrawal");
 
-        when(accountRepository.findByBeneficiaryId(1L)).thenReturn(Arrays.asList(account1, account2));
-        when(transactionRepository.findByAccountIdIn(Arrays.asList(1L, 2L))).thenReturn(Arrays.asList(transaction1, transaction2));
+        when(beneficiaryService.getBeneficiaryTransactions(1L)).thenReturn(Arrays.asList(transaction1, transaction2));
 
         List<Transaction> transactions = beneficiaryController.getBeneficiaryTransactions(1L);
         assertEquals(2, transactions.size());
@@ -138,8 +127,7 @@ public class BeneficiaryControllerTest {
         transaction3.setAmount(200.0);
         transaction3.setType("deposit");
 
-        when(accountRepository.findByBeneficiaryId(1L)).thenReturn(Arrays.asList(account1, account2));
-        when(transactionRepository.findByAccountIdIn(Arrays.asList(1L, 2L))).thenReturn(Arrays.asList(transaction1, transaction2, transaction3));
+        when(beneficiaryService.getBeneficiaryBalance(1L)).thenReturn(300.0);
 
         Double balance = beneficiaryController.getBeneficiaryBalance(1L);
         assertEquals(300.0, balance);
@@ -164,28 +152,18 @@ public class BeneficiaryControllerTest {
         Transaction transaction2 = new Transaction();
         transaction2.setTransactionId(2L);
         transaction2.setAccountId(2L);
-        transaction2.setAmount(20.0);
+        transaction2.setAmount(100.0);
         transaction2.setType("withdrawal");
 
-        when(accountRepository.findByBeneficiaryId(1L)).thenReturn(Arrays.asList(account1, account2));
-        when(transactionRepository.findByAccountIdIn(Arrays.asList(1L, 2L))).thenReturn(Arrays.asList(transaction1, transaction2));
+        when(beneficiaryService.getLargestWithdrawal(1L)).thenReturn(transaction2);
 
         Transaction largestWithdrawal = beneficiaryController.getLargestWithdrawal(1L);
-        assertEquals(50.0, largestWithdrawal.getAmount());
+        assertEquals(100.0, largestWithdrawal.getAmount());
     }
 
     @Test
     public void testGetLargestWithdrawalNotFound() {
-        Account account1 = new Account();
-        account1.setAccountId(1L);
-        account1.setBeneficiaryId(1L);
-
-        when(accountRepository.findByBeneficiaryId(1L)).thenReturn(Arrays.asList(account1));
-        when(transactionRepository.findByAccountIdIn(Arrays.asList(1L))).thenReturn(Arrays.asList());
-
+        when(beneficiaryService.getLargestWithdrawal(anyLong())).thenThrow(new ResourceNotFoundException("No withdrawals found for beneficiary"));
         assertThrows(ResourceNotFoundException.class, () -> beneficiaryController.getLargestWithdrawal(1L));
     }
 }
-
-
-
